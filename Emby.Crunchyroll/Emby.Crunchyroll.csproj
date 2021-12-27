@@ -1,13 +1,36 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <DebugType>Full</DebugType>
     <Version>0.0.1</Version>
+    <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Crunchyroll.Api" Version="0.1.0" />
-    <PackageReference Include="MediaBrowser.Server.Core" Version="4.6.0.50" />
+    <None Remove="Resources\Images\logo.png" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Images\logo.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Crunchyroll.Api" Version="0.1.8" />
+    <PackageReference Include="MediaBrowser.Server.Core" Version="4.7.0.10" />
+    <PackageReference Include="SharpGrabber.Converter" Version="1.0.0" />
+    <PackageReference Include="SharpGrabber.Hls" Version="1.2.0" />
+    <PackageReference Include="System.Memory" Version="4.5.4" />
+    <PackageReference Include="ILRepack" Version="2.0.18" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>$(MSBuildProjectName).Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="IF $(OutDir) == bin\Debug\netstandard2.0\ (&#xD;&#xA;&#xD;&#xA;echo Merging .Net core assembly&#xD;&#xA;echo Base .nuget path is $(NuGetPackageRoot)&#xD;&#xA;&#xD;&#xA;start /wait cmd /C &quot;^&quot;$(NuGetPackageRoot)\ilrepack\2.0.18\tools\ILRepack.exe^&quot; /lib:^&quot;c:\Program Files\dotnet\sdk\NuGetFallbackFolder\microsoft.netcore.app\2.0.0\ref\netcoreapp2.0^&quot;/lib:^&quot;$(NuGetPackageRoot)\mediabrowser.server.core\4.7.0.10\lib\netstandard2.0^&quot; /lib:^&quot;$(NuGetPackageRoot)\mediabrowser.common\4.7.0.10\lib\netstandard2.0^&quot; /out:$(TargetDir)$(TargetName)_Merged.dll ^&quot;$(TargetPath)^&quot; ^&quot;$(TargetDir)Newtonsoft.Json.dll^&quot; ^&quot;$(TargetDir)FFmpeg.AutoGen.dll^&quot; ^&quot;$(TargetDir)SharpGrabber.dll^&quot; ^&quot;$(TargetDir)SharpGrabber.Hls.dll^&quot; ^&quot;$(TargetDir)SharpGrabber.Converter.dll^&quot; ^&quot;$(TargetDir)Crunchyroll.Api.dll^&quot; ^&quot;$(TargetDir)System.Net.Http.Formatting.dll^&quot; &quot;&#xD;&#xA;&#xD;&#xA;echo Finished merging .Net core assembly&#xD;&#xA;&#xD;&#xA;)&#xD;&#xA;&#xD;&#xA;exit /b 0" />
+  </Target>
 
 </Project>
