@@ -22,17 +22,14 @@ namespace Emby.Crunchyroll
 {
     public class CrunchyrolChannel : IChannel, ISupportsLatestMedia, IRequiresMediaInfoCallback
     {
-        private static readonly HttpClient Client = new HttpClient();
         private static readonly HashSet<string> TempFiles = new HashSet<string>();
         private readonly ICrunchyrollApi crunchyrollApi;
         private readonly ILogger logger;
-        private readonly IFfmpegManager ffmpegManager;
 
         public CrunchyrolChannel(ILogManager logManager, IFfmpegManager ffmpegManager)
         {
             crunchyrollApi = new CrunchyrollApi("vagab0nd007+cr@outlook.com", "n62MapPMiiuv2r", "en-US");
             logger = logManager.GetLogger(GetType().Name);
-            this.ffmpegManager = ffmpegManager;
         }
 
         public string Name => "Crunchyroll";
@@ -215,7 +212,7 @@ namespace Emby.Crunchyroll
             };
         }
 
-        public async Task<IEnumerable<MediaSourceInfo>> GetChannelItemMediaInfo(string id, CancellationToken cancellationToken)
+        public Task<IEnumerable<MediaSourceInfo>> GetChannelItemMediaInfo(string id, CancellationToken cancellationToken)
         {
             if (!int.TryParse(id, out var mediaId))
             {
@@ -255,7 +252,7 @@ namespace Emby.Crunchyroll
             };
             mediaList.Add(mediaSourceInfo);
 
-            return mediaList;
+            return Task.FromResult(mediaList.AsEnumerable());
         }
 
         private bool TryGetMedia(int mediaId, out Media media)
