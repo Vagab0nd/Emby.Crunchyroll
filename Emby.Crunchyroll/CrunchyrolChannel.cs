@@ -1,8 +1,5 @@
 ﻿using Crunchyroll.Api;
 using Crunchyroll.Api.Models;
-using DotNetTools.SharpGrabber;
-using DotNetTools.SharpGrabber.Converter;
-using DotNetTools.SharpGrabber.Grabbed;
 using MediaBrowser.Controller.Channels;
 using MediaBrowser.Controller.MediaEncoding;
 using MediaBrowser.Controller.Providers;
@@ -230,46 +227,35 @@ namespace Emby.Crunchyroll
                 throw new InvalidOperationException("Failed getting media info from crunchyroll for media id: " + id);
             }
 
-            var outputFolderName = $"{media.SeriesName}/{media.CollectionName}";
-            var grabbedFile = await FetchFile(media.StreamData.Streams.First().Url, outputFolderName);
             List<MediaSourceInfo> mediaList = new List<MediaSourceInfo>();
-            logger.Debug("Serving internal channel media item stream: " + grabbedFile);
+            logger.Debug("Serving internal channel media item stream: " + media.StreamData.Streams.First().Url);
             MediaSourceInfo mediaSourceInfo = new MediaSourceInfo()
             {
                 Id = id,
                 Name = media.Name,
-                Path = grabbedFile,
+                Path = media.StreamData.Streams.First().Url,
                 RunTimeTicks = TimeSpan.FromSeconds(media.Duration).Ticks,
-                IsRemote = false,
+                IsRemote = true,
                 SupportsDirectPlay = true,
-                Protocol = MediaProtocol.File,
-                SupportsDirectStream = true
-                //MediaStreams = new List<MediaStream> {
-                //        new MediaStream
-                //        {
-                //            Type = MediaStreamType.Video,
-                //            Index =  0
+                Protocol = MediaProtocol.Http,
+                SupportsDirectStream = true,
+                MediaStreams = new List<MediaStream> {
+                        new MediaStream
+                        {
+                            Type = MediaStreamType.Video,
+                            Index =  0
 
-                //        },
-                //        new MediaStream
-                //        {
-                //            Type = MediaStreamType.Audio,
-                //            Index =  1
-                //        }
-                //}
+                        },
+                        new MediaStream
+                        {
+                            Type = MediaStreamType.Audio,
+                            Index =  1
+                        }
+                }
             };
             mediaList.Add(mediaSourceInfo);
 
             return mediaList;
-        }
-
-        private async Task<string> FetchFile(string hlsFile, string outputFolder)
-        {
-            var ffmpegPath = this.ffmpegManager.FfmpegConfiguration.EncoderPath;
-            logger.Debug($"Using ffmpeg from: {ffmpegPath}");
-            FFmpeg.AutoGen.ffmpeg.RootPath = ffmpegPath;
-
-            return await Grab(new Uri(hlsFile), outputFolder);
         }
 
         private bool TryGetMedia(int mediaId, out Media media)
@@ -284,110 +270,6 @@ namespace Emby.Crunchyroll
             {
                 return false;
             }
-        }
-
-        private async Task<string> Grab(Uri uri, string outputFolder)
-        {
-            var grabber = GrabberBuilder.New()
-                .UseDefaultServices()
-                .AddHls()
-                .Build();
-
-            logger.Debug($"Grabbing from {uri}...");
-            var grabResult = await grabber.GrabAsync(uri).ConfigureAwait(false);
-
-            var reference = grabResult.Resource<GrabbedHlsStreamReference>();
-            if (reference != null)
-            {
-                // Redirect to an M3U8 playlist
-                return await Grab(reference.ResourceUri, outputFolder);
-            }
-
-            var metadataResources = grabResult.Resources<GrabbedHlsStreamMetadata>().ToArray();
-            if (metadataResources.Length > 0)
-            {
-                // Description for one or more M3U8 playlists
-                GrabbedHlsStreamMetadata selection;
-                if (metadataResources.Length == 1)
-                {
-                    selection = metadataResources.Single();
-                }
-                else
-                {
-                    logger.Debug("=== Streams ===");
-                    for (var i = 0; i < metadataResources.Length; i++)
-                    {
-                        var res = metadataResources[i];
-                        logger.Debug("{0}. {1}", i + 1, $"{res.Name} {res.Resolution}");
-                    }
-                    var bestStream = metadataResources.OrderByDescending(x => x.Resolution.Width).First();
-                    logger.Debug("Selected a stream: ");
-                    logger.Debug($"{bestStream.Name} {bestStream.Resolution}");
-                    selection = bestStream;
-                }
-
-                // Get information from the HLS stream
-                var grabbedStream = await selection.Stream.Value;
-                return await Grab(grabbedStream, selection, grabResult, outputFolder);
-            }
-
-            throw new Exception("Could not grab the HLS stream.");
-        }
-
-        private async Task<string> Grab(GrabbedHlsStream stream, GrabbedHlsStreamMetadata metadata, GrabResult grabResult, string outputFolder)
-        {
-            logger.Debug("=== Downloading ===");
-            logger.Debug("{0} segments", stream.Segments.Count);
-            logger.Debug("Duration: {0}", stream.Length);
-
-            var tempFiles = new List<string>();
-            try
-            {
-                for (var i = 0; i < stream.Segments.Count; i++)
-                {
-                    var segment = stream.Segments[i];
-                    logger.Debug($"Downloading segment #{i + 1} {segment.Title}...");
-                    var outputPath = Path.GetTempFileName();
-                    tempFiles.Add(outputPath);
-                    using(var httpClient = new HttpClient())
-                    using(var responseStream = await httpClient.GetStreamAsync(segment.Uri))
-                    using(var inputStream = await grabResult.WrapStreamAsync(responseStream))
-                    using(var outputStream = new FileStream(outputPath, FileMode.Create))
-                    {
-                        await inputStream.CopyToAsync(outputStream);
-                    }
-                }
-
-                return CreateOutputFile(tempFiles, metadata, outputFolder);
-            }
-            finally
-            {
-                foreach (var tempFile in tempFiles)
-                {
-                    if (File.Exists(tempFile))
-                        File.Delete(tempFile);
-                }
-                logger.Debug("Cleaned up temp files.");
-            }
-        }
-
-        private string CreateOutputFile(List<string> tempFiles, GrabbedHlsStreamMetadata metadata, string outputFolder)
-        {
-            logger.Debug("All segments were downloaded successfully."); 
-            var outputPath = "/share/CACHEDEV2_DATA/Video/Anime/" + outputFolder;
-            var concatenator = new MediaConcatenator(outputPath)
-            {
-                OutputMimeType = metadata.OutputFormat.Mime,
-                OutputExtension = metadata.OutputFormat.Extension,
-            };
-            foreach (var tempFile in tempFiles)
-            {
-                concatenator.AddSource(tempFile);
-            }
-            concatenator.Build();
-            logger.Debug("Output file created successfully at!");
-
-            return outputPath;
-        }
+        }        
     }
 }
