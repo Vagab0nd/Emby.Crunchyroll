@@ -263,8 +263,9 @@ namespace Emby.Crunchyroll
                 media = crunchyrollApi.GetInfo<Media>(mediaId).GetAwaiter().GetResult();
                 return true;
             }
-            catch (Exception)
+            catch (Exception e)
             {
+                logger.ErrorException("Failed getting media info from crunchyroll for media id: " + mediaId, e);
                 return false;
             }
         }        
